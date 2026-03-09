@@ -2,8 +2,14 @@ import os
 from flask import Flask, jsonify, request
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import redis
+import json
 
 app = Flask(__name__)
+
+redis_client = None
+if os.environ.get("REDIS_HOST"):
+    redis_client = redis.Redis(host=os.environ.get("REDIS_HOST"), decode_responses=True)
 
 def get_db():
     return psycopg2.connect(
@@ -36,12 +42,21 @@ def health():
 
 @app.route("/api/tasks", methods=["GET"])
 def get_tasks():
+    if redis_client:
+        cached = redis_client.get("tasks")
+        if cached:
+            return jsonify(json.loads(cached))
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM tasks ORDER BY created_at DESC")
     tasks = cur.fetchall()
     cur.close()
     conn.close()
+
+    if redis_client:
+        redis_client.setex("tasks", 30, json.dumps(tasks, default=str))
+
     return jsonify(tasks)
 
 @app.route("/api/tasks", methods=["POST"])
@@ -57,6 +72,10 @@ def create_task():
     conn.commit()
     cur.close()
     conn.close()
+
+    if redis_client:
+        redis_client.delete("tasks")
+
     return jsonify(task), 201
 
 @app.route("/api/tasks/<int:task_id>", methods=["PATCH"])
@@ -74,6 +93,10 @@ def toggle_task(task_id):
     
     if task is None:
         return jsonify({"error": "not found"}), 404
+
+    if redis_client:
+        redis_client.delete("tasks")
+
     return jsonify(task)
 
 @app.route("/api/tasks/<int:task_id>", methods=["DELETE"])
@@ -84,6 +107,10 @@ def delete_task(task_id):
     conn.commit()
     cur.close()
     conn.close()
+
+    if redis_client:
+        redis_client.delete("tasks")
+
     return jsonify({"deleted": task_id})
 
 if __name__ == "__main__":
