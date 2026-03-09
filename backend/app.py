@@ -28,6 +28,8 @@ def init_db():
     cur.close()
     conn.close()
 
+init_db()
+
 @app.route("/api/health")
 def health():
     return jsonify({"status": "ok"})
