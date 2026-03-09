@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Lab - Tasks</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 50px auto; 
+            padding: 0 20px;
+        }
+        input, button { 
+            padding: 8px; 
+            margin: 5px; 
+        }
+        ul { 
+            list-style: none; 
+            padding: 0; 
+        }
+        li { 
+            padding: 10px; 
+            background: #f5f5f5; 
+            margin: 5px 0; 
+            display: flex; 
+            align-items: center; 
+        }
+        .done { 
+            text-decoration: line-through; 
+            color: #888; 
+        }
+        .delete-btn { 
+            margin-left: auto; 
+            background: #ff4444; 
+            color: white; 
+            border: none; 
+            padding: 5px 10px; 
+            cursor: pointer; 
+        }
+    </style>
+</head>
+<body>
+    <h1>📋 Task Manager</h1>
+    
+    <div>
+        <input type="text" id="taskInput" placeholder="New task...">
+        <button onclick="addTask()">Add</button>
+    </div>
+    
+    <ul id="tasksList"></ul>
+
+    <script>
+        async function loadTasks() {
+            const response = await fetch('/api/tasks');
+            const tasks = await response.json();
+            const list = document.getElementById('tasksList');
+            list.innerHTML = '';
+            
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <input type="checkbox" ${task.done ? 'checked' : ''} 
+                           onchange="toggleTask(${task.id})">
+                    <span class="${task.done ? 'done' : ''}">${task.title}</span>
+                    <button class="delete-btn" onclick="deleteTask(${task.id})">×</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        async function addTask() {
+            const input = document.getElementById('taskInput');
+            if (!input.value.trim()) return;
+            
+            await fetch('/api/tasks', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title: input.value})
+            });
+            
+            input.value = '';
+            loadTasks();
+        }
+
+        async function toggleTask(id) {
+            await fetch(`/api/tasks/${id}`, {method: 'PATCH'});
+            loadTasks();
+        }
+
+        async function deleteTask(id) {
+            await fetch(`/api/tasks/${id}`, {method: 'DELETE'});
+            loadTasks();
+        }
+
+        loadTasks();
+    </script>
+</body>
+</html>
